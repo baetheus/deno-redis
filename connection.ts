@@ -19,6 +19,7 @@ export type RedisConnectionOptions = {
   tls?: boolean;
   db?: number;
   password?: string;
+  username?: string;
   name?: string;
   maxRetryCount?: number;
   retryInterval?: number;
@@ -48,7 +49,7 @@ export class RedisConnection implements Connection {
   constructor(
     hostname: string,
     port: number | string,
-    private options: RedisConnectionOptions,
+    private options: RedisConnectionOptions
   ) {
     this.connectThunkified = this.thunkifyConnect(hostname, port, options);
   }
@@ -56,7 +57,7 @@ export class RedisConnection implements Connection {
   private thunkifyConnect(
     hostname: string,
     port: string | number,
-    options: RedisConnectionOptions,
+    options: RedisConnectionOptions
   ): () => Promise<RedisConnection> {
     return async () => {
       const dialOpts: Deno.ConnectOptions = {
@@ -85,7 +86,7 @@ export class RedisConnection implements Connection {
 
       try {
         if (options?.password != null) {
-          await this.authenticate(options.password);
+          await this.authenticate(options.password, options.username);
         }
         if (options?.db) {
           await this.selectDb(options.db);
@@ -99,12 +100,18 @@ export class RedisConnection implements Connection {
     };
   }
 
-  private authenticate(password: string): Promise<RedisRawReply> {
+  private authenticate(
+    password: string,
+    username?: string
+  ): Promise<RedisRawReply> {
+    if (username !== undefined && username.length > 0) {
+      return sendCommand(this.writer, this.reader, "AUTH", username, password);
+    }
     return sendCommand(this.writer, this.reader, "AUTH", password);
   }
 
   private selectDb(
-    db: number | undefined = this.options.db,
+    db: number | undefined = this.options.db
   ): Promise<RedisRawReply> {
     if (!db) throw new Error("The database index is undefined.");
     return sendCommand(this.writer, this.reader, "SELECT", db);
